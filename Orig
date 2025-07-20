@@ -111,8 +111,12 @@ for _, egg in pairs(collectionService:GetTagged("PetEggServer")) do addEgg(egg) 
 collectionService:GetInstanceAddedSignal("PetEggServer"):Connect(addEgg)
 collectionService:GetInstanceRemovedSignal("PetEggServer"):Connect(removeEgg)
 
-local gui = Instance.new("ScreenGui", playerGui)
+-- GUI Fix + Setup
+local gui = Instance.new("ScreenGui")
 gui.Name = "RandomizerUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 250, 0, 200)
