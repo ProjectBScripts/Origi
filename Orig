@@ -33,7 +33,6 @@ local autoRandomize = false
 local cooldown = 4
 local lastRandomize = 0
 
--- Weighted Random
 local function getRandomPet(eggName)
     local pool = eggChances[eggName]
     if not pool then return "?" end
@@ -52,7 +51,6 @@ local function getRandomPet(eggName)
     return valid[1].pet
 end
 
--- Create ESP
 local function createESP(egg, petName)
     local part = egg:FindFirstChildWhichIsA("BasePart") or egg.PrimaryPart
     if not part then return nil end
@@ -74,7 +72,15 @@ local function createESP(egg, petName)
     return billboard, label
 end
 
--- Add Egg
+local function updateESPText(label, pet)
+    label.Text = pet
+    if rarePets[pet] then
+        label.TextColor3 = Color3.fromRGB(0, 255, 0)
+    else
+        label.TextColor3 = Color3.new(1, 1, 1)
+    end
+end
+
 local function addEgg(egg)
     if egg:GetAttribute("OWNER") ~= players.LocalPlayer.Name then return end
     local id = egg:GetAttribute("OBJECT_UUID")
@@ -82,10 +88,10 @@ local function addEgg(egg)
     if displayedEggs[id] then return end
     local pet = getRandomPet(eggName)
     local esp, label = createESP(egg, pet)
+    updateESPText(label, pet)
     displayedEggs[id] = {egg = egg, esp = esp, label = label, pet = pet, eggName = eggName}
 end
 
--- Remove Egg
 local function removeEgg(egg)
     local id = egg:GetAttribute("OBJECT_UUID")
     if displayedEggs[id] then
@@ -98,7 +104,6 @@ for _, egg in pairs(collectionService:GetTagged("PetEggServer")) do addEgg(egg) 
 collectionService:GetInstanceAddedSignal("PetEggServer"):Connect(addEgg)
 collectionService:GetInstanceRemovedSignal("PetEggServer"):Connect(removeEgg)
 
--- GUI
 local gui = Instance.new("ScreenGui", playerGui)
 gui.Name = "RandomizerUI"
 
@@ -171,7 +176,7 @@ onceBtn.BorderSizePixel = 0
 onceBtn.MouseButton1Click:Connect(function()
     for _, v in pairs(displayedEggs) do
         local pet = getRandomPet(v.eggName)
-        v.label.Text = pet
+        updateESPText(v.label, pet)
         v.pet = pet
         if rarePets[pet] then
             autoRandomize = false
@@ -202,7 +207,6 @@ credits.TextColor3 = Color3.fromRGB(150, 150, 150)
 credits.BackgroundTransparency = 1
 credits.TextXAlignment = Enum.TextXAlignment.Left
 
--- Auto Randomize Loop
 runService.RenderStepped:Connect(function()
     if autoRandomize then
         local now = tick()
@@ -210,7 +214,7 @@ runService.RenderStepped:Connect(function()
         if timeLeft <= 0 then
             for _, v in pairs(displayedEggs) do
                 local pet = getRandomPet(v.eggName)
-                v.label.Text = pet
+                updateESPText(v.label, pet)
                 v.pet = pet
                 if rarePets[pet] then
                     autoRandomize = false
