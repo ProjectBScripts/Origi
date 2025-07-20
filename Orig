@@ -1,10 +1,11 @@
 local players = game:GetService("Players")
 local collectionService = game:GetService("CollectionService")
-local RunService = game:GetService("RunService")
+local runService = game:GetService("RunService")
 
 local localPlayer = players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
+-- Egg Data
 local eggChances = {
     ["Common Egg"] = {["Dog"] = 33, ["Bunny"] = 33, ["Golden Lab"] = 33},
     ["Uncommon Egg"] = {["Black Bunny"] = 25, ["Chicken"] = 25, ["Cat"] = 25, ["Deer"] = 25},
@@ -22,62 +23,50 @@ local eggChances = {
     ["Dinosaur Egg"] = {["Raptor"] = 33, ["Triceratops"] = 33, ["T-Rex"] = 1, ["Stegosaurus"] = 33, ["Pterodactyl"] = 33, ["Brontosaurus"] = 33}
 }
 
-local autoStopPets = {
+local rarePets = {
     ["Raccoon"] = true, ["Dragon Fly"] = true, ["Queen Bee"] = true,
     ["Red Fox"] = true, ["Disco Bee"] = true, ["Butterfly"] = true
 }
 
+-- Variables
 local displayedEggs = {}
-local espEnabled = true
+local espOn = true
 local autoRandomize = false
 local cooldown = 6
 local lastRandomize = 0
 
--- Weighted Random Pet
-local function weightedRandom(options)
-    local valid, total = {}, 0
-    for pet, chance in pairs(options) do
+-- Weighted Random Function
+local function getRandomPet(eggName, lastPet)
+    local pool = eggChances[eggName]
+    if not pool then return nil end
+    local total, valid = 0, {}
+    for pet, chance in pairs(pool) do
         if chance > 0 then
             table.insert(valid, {pet = pet, chance = chance})
             total += chance
         end
     end
-    local roll, cumulative = math.random() * total, 0
+    local roll, cum = math.random() * total, 0
     for _, v in ipairs(valid) do
-        cumulative += v.chance
-        if roll <= cumulative then
+        cum += v.chance
+        if roll <= cum then
             return v.pet
         end
     end
-    return valid[1].pet
-end
-
--- Get Random Pet (non-repeating)
-local function getRandomPet(eggName, lastPet)
-    local pool = eggChances[eggName]
-    if not pool then return nil end
-    local tries = 0
-    while tries < 5 do
-        local pet = weightedRandom(pool)
-        if pet ~= lastPet or math.random() < 0.3 then
-            return pet
-        end
-        tries += 1
-    end
-    return lastPet
+    return lastPet or valid[1].pet
 end
 
 -- Create ESP Label
 local function createESP(egg, text)
     local part = egg:FindFirstChildWhichIsA("BasePart") or egg.PrimaryPart
-    if not part then return end
+    if not part then return nil end
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "EggESP"
     billboard.Size = UDim2.new(0, 200, 0, 50)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-    billboard.Adornee = part
     billboard.AlwaysOnTop = true
-    local label = Instance.new("TextLabel")
+    billboard.Adornee = part
+    local label = Instance.new("TextLabel", billboard)
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = text
@@ -85,31 +74,22 @@ local function createESP(egg, text)
     label.TextStrokeTransparency = 0
     label.TextColor3 = Color3.new(1, 1, 1)
     label.Font = Enum.Font.GothamBold
-    label.Parent = billboard
     billboard.Parent = egg
-    return billboard
+    return billboard, label
 end
 
--- Add ESP to Egg
+-- Add Egg ESP
 local function addEgg(egg)
     if egg:GetAttribute("OWNER") ~= localPlayer.Name then return end
-    local eggName = egg:GetAttribute("EggName")
     local id = egg:GetAttribute("OBJECT_UUID")
+    local eggName = egg:GetAttribute("EggName")
     if displayedEggs[id] then return end
-
     local pet = getRandomPet(eggName, nil)
-    local label = eggName .. " | " .. (pet or "?")
-    local esp = createESP(egg, label)
-    if not esp then return end
-
-    displayedEggs[id] = {egg = egg, esp = esp, label = esp.TextLabel, lastPet = pet, eggName = eggName}
-
-    if autoStopPets[pet] then
-        autoRandomize = false
-        print("AutoStop! Found rare pet: " .. pet)
-    end
+    local esp, label = createESP(egg, eggName .. " | " .. pet)
+    displayedEggs[id] = {egg = egg, esp = esp, label = label, pet = pet, eggName = eggName}
 end
 
+-- Remove ESP
 local function removeEgg(egg)
     local id = egg:GetAttribute("OBJECT_UUID")
     if displayedEggs[id] then
@@ -118,28 +98,23 @@ local function removeEgg(egg)
     end
 end
 
--- Initial Eggs
-for _, egg in pairs(collectionService:GetTagged("PetEggServer")) do
-    addEgg(egg)
-end
-
+-- Init ESP
+for _, egg in pairs(collectionService:GetTagged("PetEggServer")) do addEgg(egg) end
 collectionService:GetInstanceAddedSignal("PetEggServer"):Connect(addEgg)
 collectionService:GetInstanceRemovedSignal("PetEggServer"):Connect(removeEgg)
 
 -- GUI Setup
-local gui = Instance.new("ScreenGui")
-gui.Name = "Randomizer"
-gui.Parent = playerGui
+local gui = Instance.new("ScreenGui", playerGui)
+gui.Name = "RandomizerUI"
 
-local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 250, 0, 200)
-main.Position = UDim2.new(0.5, -125, 0.5, -100)
-main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-main.Active = true
-main.Draggable = true
-main.Parent = gui
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 250, 0, 200)
+frame.Position = UDim2.new(0.5, -125, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true
+frame.Draggable = true
 
-local title = Instance.new("TextLabel", main)
+local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, -40, 0, 30)
 title.Position = UDim2.new(0, 10, 0, 0)
 title.Text = "🥚 Randomizer"
@@ -149,18 +124,18 @@ title.TextColor3 = Color3.new(1, 1, 1)
 title.BackgroundTransparency = 1
 title.TextXAlignment = Enum.TextXAlignment.Left
 
-local closeBtn = Instance.new("TextButton", main)
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 0)
-closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 18
-closeBtn.TextColor3 = Color3.new(1, 1, 1)
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeBtn.BorderSizePixel = 0
-closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0, 30, 0, 30)
+close.Position = UDim2.new(1, -35, 0, 0)
+close.Text = "X"
+close.Font = Enum.Font.GothamBold
+close.TextSize = 18
+close.TextColor3 = Color3.new(1, 1, 1)
+close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+close.BorderSizePixel = 0
+close.MouseButton1Click:Connect(function() gui:Destroy() end)
 
-local espBtn = Instance.new("TextButton", main)
+local espBtn = Instance.new("TextButton", frame)
 espBtn.Size = UDim2.new(0.9, 0, 0, 30)
 espBtn.Position = UDim2.new(0.05, 0, 0, 40)
 espBtn.Text = "🔍 ESP: ON"
@@ -169,16 +144,13 @@ espBtn.TextSize = 16
 espBtn.TextColor3 = Color3.new(1, 1, 1)
 espBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 espBtn.BorderSizePixel = 0
-
 espBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    espBtn.Text = espEnabled and "🔍 ESP: ON" or "🔍 ESP: OFF"
-    for _, data in pairs(displayedEggs) do
-        data.esp.Enabled = espEnabled
-    end
+    espOn = not espOn
+    espBtn.Text = espOn and "🔍 ESP: ON" or "🔍 ESP: OFF"
+    for _, v in pairs(displayedEggs) do v.esp.Enabled = espOn end
 end)
 
-local autoBtn = Instance.new("TextButton", main)
+local autoBtn = Instance.new("TextButton", frame)
 autoBtn.Size = UDim2.new(0.9, 0, 0, 30)
 autoBtn.Position = UDim2.new(0.05, 0, 0, 80)
 autoBtn.Text = "🔄 Auto Randomize: OFF"
@@ -187,13 +159,12 @@ autoBtn.TextSize = 16
 autoBtn.TextColor3 = Color3.new(1, 1, 1)
 autoBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 autoBtn.BorderSizePixel = 0
-
 autoBtn.MouseButton1Click:Connect(function()
     autoRandomize = not autoRandomize
     autoBtn.Text = autoRandomize and "🔄 Auto Randomize: ON" or "🔄 Auto Randomize: OFF"
 end)
 
-local onceBtn = Instance.new("TextButton", main)
+local onceBtn = Instance.new("TextButton", frame)
 onceBtn.Size = UDim2.new(0.9, 0, 0, 30)
 onceBtn.Position = UDim2.new(0.05, 0, 0, 120)
 onceBtn.Text = "🎲 Randomize Once"
@@ -202,31 +173,31 @@ onceBtn.TextSize = 16
 onceBtn.TextColor3 = Color3.new(1, 1, 1)
 onceBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 onceBtn.BorderSizePixel = 0
-
 onceBtn.MouseButton1Click:Connect(function()
-    lastRandomize = tick()
-    for _, data in pairs(displayedEggs) do
-        local pet = getRandomPet(data.eggName, data.lastPet)
-        data.label.Text = data.eggName .. " | " .. pet
-        data.lastPet = pet
-        if autoStopPets[pet] then
+    for _, v in pairs(displayedEggs) do
+        local pet = getRandomPet(v.eggName, v.pet)
+        v.label.Text = v.eggName .. " | " .. pet
+        v.pet = pet
+        if rarePets[pet] then
             autoRandomize = false
-            print("AutoStop! Found rare pet: " .. pet)
+            autoBtn.Text = "🔄 Auto Randomize: OFF"
+            print("Auto Stop: Rare Pet Found - " .. pet)
         end
     end
+    lastRandomize = tick()
 end)
 
-local cooldownText = Instance.new("TextLabel", main)
-cooldownText.Size = UDim2.new(1, -20, 0, 20)
-cooldownText.Position = UDim2.new(0, 10, 0, 160)
-cooldownText.Text = "Randomize in: OFF"
-cooldownText.Font = Enum.Font.Gotham
-cooldownText.TextSize = 14
-cooldownText.TextColor3 = Color3.new(1, 1, 1)
-cooldownText.BackgroundTransparency = 1
-cooldownText.TextXAlignment = Enum.TextXAlignment.Left
+local cooldownLabel = Instance.new("TextLabel", frame)
+cooldownLabel.Size = UDim2.new(1, -20, 0, 20)
+cooldownLabel.Position = UDim2.new(0, 10, 0, 160)
+cooldownLabel.Text = "Randomize in: OFF"
+cooldownLabel.Font = Enum.Font.Gotham
+cooldownLabel.TextSize = 14
+cooldownLabel.TextColor3 = Color3.new(1, 1, 1)
+cooldownLabel.BackgroundTransparency = 1
+cooldownLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-local credits = Instance.new("TextLabel", main)
+local credits = Instance.new("TextLabel", frame)
 credits.Size = UDim2.new(1, -10, 0, 15)
 credits.Position = UDim2.new(0, 5, 1, -15)
 credits.Text = "Created by ProjectB"
@@ -236,25 +207,26 @@ credits.TextColor3 = Color3.fromRGB(150, 150, 150)
 credits.BackgroundTransparency = 1
 credits.TextXAlignment = Enum.TextXAlignment.Left
 
--- Loop
-RunService.RenderStepped:Connect(function()
+-- Auto Randomize Loop
+runService.RenderStepped:Connect(function()
     if autoRandomize then
         local now = tick()
         local timeLeft = cooldown - (now - lastRandomize)
         if timeLeft <= 0 then
-            lastRandomize = now
-            for _, data in pairs(displayedEggs) do
-                local pet = getRandomPet(data.eggName, data.lastPet)
-                data.label.Text = data.eggName .. " | " .. pet
-                data.lastPet = pet
-                if autoStopPets[pet] then
+            for _, v in pairs(displayedEggs) do
+                local pet = getRandomPet(v.eggName, v.pet)
+                v.label.Text = v.eggName .. " | " .. pet
+                v.pet = pet
+                if rarePets[pet] then
                     autoRandomize = false
-                    print("AutoStop! Found rare pet: " .. pet)
+                    autoBtn.Text = "🔄 Auto Randomize: OFF"
+                    print("Auto Stop: Rare Pet Found - " .. pet)
                 end
             end
+            lastRandomize = tick()
         end
-        cooldownText.Text = string.format("Randomize in: %.1fs", math.max(0, timeLeft))
+        cooldownLabel.Text = string.format("Randomize in: %.1fs", math.max(0, timeLeft))
     else
-        cooldownText.Text = "Randomize in: OFF"
+        cooldownLabel.Text = "Randomize in: OFF"
     end
 end)
