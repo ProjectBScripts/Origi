@@ -5,7 +5,6 @@ local runService = game:GetService("RunService")
 local localPlayer = players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
--- Egg Data
 local eggChances = {
     ["Common Egg"] = {["Dog"] = 33, ["Bunny"] = 33, ["Golden Lab"] = 33},
     ["Uncommon Egg"] = {["Black Bunny"] = 25, ["Chicken"] = 25, ["Cat"] = 25, ["Deer"] = 25},
@@ -28,17 +27,16 @@ local rarePets = {
     ["Red Fox"] = true, ["Disco Bee"] = true, ["Butterfly"] = true
 }
 
--- Variables
 local displayedEggs = {}
 local espOn = true
 local autoRandomize = false
-local cooldown = 6
+local cooldown = 4
 local lastRandomize = 0
 
--- Weighted Random Function
-local function getRandomPet(eggName, lastPet)
+-- Weighted Random
+local function getRandomPet(eggName)
     local pool = eggChances[eggName]
-    if not pool then return nil end
+    if not pool then return "?" end
     local total, valid = 0, {}
     for pet, chance in pairs(pool) do
         if chance > 0 then
@@ -49,15 +47,13 @@ local function getRandomPet(eggName, lastPet)
     local roll, cum = math.random() * total, 0
     for _, v in ipairs(valid) do
         cum += v.chance
-        if roll <= cum then
-            return v.pet
-        end
+        if roll <= cum then return v.pet end
     end
-    return lastPet or valid[1].pet
+    return valid[1].pet
 end
 
--- Create ESP Label
-local function createESP(egg, text)
+-- Create ESP
+local function createESP(egg, petName)
     local part = egg:FindFirstChildWhichIsA("BasePart") or egg.PrimaryPart
     if not part then return nil end
     local billboard = Instance.new("BillboardGui")
@@ -69,7 +65,7 @@ local function createESP(egg, text)
     local label = Instance.new("TextLabel", billboard)
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = text
+    label.Text = petName
     label.TextScaled = true
     label.TextStrokeTransparency = 0
     label.TextColor3 = Color3.new(1, 1, 1)
@@ -78,18 +74,18 @@ local function createESP(egg, text)
     return billboard, label
 end
 
--- Add Egg ESP
+-- Add Egg
 local function addEgg(egg)
-    if egg:GetAttribute("OWNER") ~= localPlayer.Name then return end
+    if egg:GetAttribute("OWNER") ~= players.LocalPlayer.Name then return end
     local id = egg:GetAttribute("OBJECT_UUID")
     local eggName = egg:GetAttribute("EggName")
     if displayedEggs[id] then return end
-    local pet = getRandomPet(eggName, nil)
-    local esp, label = createESP(egg, eggName .. " | " .. pet)
+    local pet = getRandomPet(eggName)
+    local esp, label = createESP(egg, pet)
     displayedEggs[id] = {egg = egg, esp = esp, label = label, pet = pet, eggName = eggName}
 end
 
--- Remove ESP
+-- Remove Egg
 local function removeEgg(egg)
     local id = egg:GetAttribute("OBJECT_UUID")
     if displayedEggs[id] then
@@ -98,12 +94,11 @@ local function removeEgg(egg)
     end
 end
 
--- Init ESP
 for _, egg in pairs(collectionService:GetTagged("PetEggServer")) do addEgg(egg) end
 collectionService:GetInstanceAddedSignal("PetEggServer"):Connect(addEgg)
 collectionService:GetInstanceRemovedSignal("PetEggServer"):Connect(removeEgg)
 
--- GUI Setup
+-- GUI
 local gui = Instance.new("ScreenGui", playerGui)
 gui.Name = "RandomizerUI"
 
@@ -175,8 +170,8 @@ onceBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 onceBtn.BorderSizePixel = 0
 onceBtn.MouseButton1Click:Connect(function()
     for _, v in pairs(displayedEggs) do
-        local pet = getRandomPet(v.eggName, v.pet)
-        v.label.Text = v.eggName .. " | " .. pet
+        local pet = getRandomPet(v.eggName)
+        v.label.Text = pet
         v.pet = pet
         if rarePets[pet] then
             autoRandomize = false
@@ -214,8 +209,8 @@ runService.RenderStepped:Connect(function()
         local timeLeft = cooldown - (now - lastRandomize)
         if timeLeft <= 0 then
             for _, v in pairs(displayedEggs) do
-                local pet = getRandomPet(v.eggName, v.pet)
-                v.label.Text = v.eggName .. " | " .. pet
+                local pet = getRandomPet(v.eggName)
+                v.label.Text = pet
                 v.pet = pet
                 if rarePets[pet] then
                     autoRandomize = false
