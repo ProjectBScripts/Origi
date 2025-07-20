@@ -72,12 +72,18 @@ local function createESP(egg, petName)
     return billboard, label
 end
 
-local function updateESPText(label, pet)
-    label.Text = pet
-    if rarePets[pet] then
-        label.TextColor3 = Color3.fromRGB(0, 255, 0)
+local function updateESP(v)
+    local cooldownValue = v.egg:GetAttribute("REROLL_COOLDOWN") or 0
+    if cooldownValue > 0 then
+        v.label.Text = "Not Yet Ready To Randomize"
+        v.label.TextColor3 = Color3.new(1, 1, 1)
     else
-        label.TextColor3 = Color3.new(1, 1, 1)
+        v.label.Text = v.pet
+        if rarePets[v.pet] then
+            v.label.TextColor3 = Color3.fromRGB(0, 255, 0)
+        else
+            v.label.TextColor3 = Color3.new(1, 1, 1)
+        end
     end
 end
 
@@ -88,8 +94,9 @@ local function addEgg(egg)
     if displayedEggs[id] then return end
     local pet = getRandomPet(eggName)
     local esp, label = createESP(egg, pet)
-    updateESPText(label, pet)
-    displayedEggs[id] = {egg = egg, esp = esp, label = label, pet = pet, eggName = eggName}
+    local v = {egg = egg, esp = esp, label = label, pet = pet, eggName = eggName}
+    displayedEggs[id] = v
+    updateESP(v)
 end
 
 local function removeEgg(egg)
@@ -175,13 +182,14 @@ onceBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 onceBtn.BorderSizePixel = 0
 onceBtn.MouseButton1Click:Connect(function()
     for _, v in pairs(displayedEggs) do
-        local pet = getRandomPet(v.eggName)
-        updateESPText(v.label, pet)
-        v.pet = pet
-        if rarePets[pet] then
+        if (v.egg:GetAttribute("REROLL_COOLDOWN") or 0) <= 0 then
+            v.pet = getRandomPet(v.eggName)
+        end
+        updateESP(v)
+        if rarePets[v.pet] then
             autoRandomize = false
             autoBtn.Text = "🔄 Auto Randomize: OFF"
-            print("Auto Stop: Rare Pet Found - " .. pet)
+            print("Auto Stop: Rare Pet Found - " .. v.pet)
         end
     end
     lastRandomize = tick()
@@ -208,18 +216,21 @@ credits.BackgroundTransparency = 1
 credits.TextXAlignment = Enum.TextXAlignment.Left
 
 runService.RenderStepped:Connect(function()
+    for _, v in pairs(displayedEggs) do updateESP(v) end
+
     if autoRandomize then
         local now = tick()
         local timeLeft = cooldown - (now - lastRandomize)
         if timeLeft <= 0 then
             for _, v in pairs(displayedEggs) do
-                local pet = getRandomPet(v.eggName)
-                updateESPText(v.label, pet)
-                v.pet = pet
-                if rarePets[pet] then
+                if (v.egg:GetAttribute("REROLL_COOLDOWN") or 0) <= 0 then
+                    v.pet = getRandomPet(v.eggName)
+                end
+                updateESP(v)
+                if rarePets[v.pet] then
                     autoRandomize = false
                     autoBtn.Text = "🔄 Auto Randomize: OFF"
-                    print("Auto Stop: Rare Pet Found - " .. pet)
+                    print("Auto Stop: Rare Pet Found - " .. v.pet)
                 end
             end
             lastRandomize = tick()
